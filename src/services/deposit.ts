@@ -1,5 +1,4 @@
 import type { Page } from 'playwright';
-import { ensureLoggedIn, doLogin } from './auth.js';
 
 const BASE_URL = 'https://projects.co.id/';
 
@@ -36,8 +35,13 @@ async function getDepositUrl(page: Page): Promise<string> {
 }
 
 async function emptyCart(page: Page): Promise<void> {
-  await page.goto(BASE_URL + 'user/cart/empty_cart/0d6a15/leonurium-ranggaleoo', { timeout: 30_000 });
+  await page.goto(BASE_URL + 'user/cart/view', { timeout: 30_000 });
   await page.waitForTimeout(1_500);
+  const emptyLink = page.locator('a[href*="empty_cart"]').first();
+  if (await emptyLink.isVisible().catch(() => false)) {
+    await emptyLink.click();
+    await page.waitForTimeout(1_500);
+  }
 }
 
 async function findLatestOrderId(page: Page): Promise<string | null> {
@@ -114,10 +118,7 @@ export async function createDeposit(page: Page, amount: number): Promise<Deposit
 
   // Check if session expired
   if (page.url().includes('unauthorized')) {
-    const reLoggedIn = await doLogin(page, 'ranggaleoo', '#Sasuke96');
-    if (!reLoggedIn) throw new Error('Session expired and re-login failed');
-    await page.goto(BASE_URL + depositPath, { timeout: 30_000 });
-    await page.waitForTimeout(2_000);
+    throw new Error('Session expired — reconnect via POST /api/auth/connect');
   }
 
   // 3. Fill & submit deposit form

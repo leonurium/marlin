@@ -53,35 +53,64 @@ REST API wrapper for [Projects.co.id](https://projects.co.id) — automate depos
 ## Quick Start
 
 ```bash
-# Install
 npm install
-
-# Set browsers path (optional — defaults to /root/.cloakbrowser/...)
 cp .env.example .env
-
-# Run
+# Set CHROMIUM_PATH to your local CloakBrowser binary, then:
 npm start
 ```
 
 Server listens on `http://localhost:3100`.
 
-## How It Works
+**Local CloakBrowser** (recommended for development):
 
-Marlin uses **Playwright** (stealth Chromium via CloakBrowser) to automate Projects.co-id's web interface:
+```bash
+BROWSER_MODE=local
+CHROMIUM_PATH=/path/to/cloakbrowser/chromium-*/chrome
+```
 
-1. **Auth** — logs in, saves session as Playwright storage state
-2. **Deposit** — uses the saved session to submit deposit form → extracts payment instructions
-3. **Confirm** — checks order status → clicks Confirm Payment if still `Waiting Payment`
+## Browser Modes
 
-Each `session_id` maps to an isolated Playwright browser context with its own cookies. Sessions expire after 30 minutes of inactivity (auto-cleanup).
+| Mode | When to use | Required env |
+|------|-------------|--------------|
+| **local** | Dev machine with CloakBrowser installed | `CHROMIUM_PATH` (optional) |
+| **cdp** | Shared `cloakserve` on Docker/Koyeb | `CDP_URL` |
+| **manager** | [CloakBrowser Manager](https://github.com/CloakHQ/CloakBrowser-Manager) | `MANAGER_URL` |
+| **auto** | `MANAGER_URL` → `CDP_URL` → local | — |
+
+```bash
+# Remote CDP (cloakserve)
+BROWSER_MODE=cdp
+CDP_URL=https://your-cloakbrowser.example.com
+
+# Manager (profile per session)
+BROWSER_MODE=manager
+MANAGER_URL=http://localhost:8080
+```
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3100` | Server port |
-| `CHROMIUM_PATH` | `/root/.cloakbrowser/...` | Path to CloakBrowser Chromium |
+| `BROWSER_MODE` | `auto` | `auto`, `local`, `cdp`, or `manager` |
+| `MANAGER_URL` | — | CloakBrowser Manager base URL |
+| `MANAGER_AUTH_TOKEN` | — | Bearer token when Manager `AUTH_TOKEN` is set |
+| `MANAGER_PROXY` | — | Residential proxy URL for Manager profiles (`http://user:pass@host:port`) |
+| `MANAGER_GEOIP` | `true` if proxy set | Match timezone/locale to proxy exit IP |
+| `MANAGER_HEADLESS` | `true` | Set `false` for headed mode |
+| `CHROMIUM_PATH` | auto | Local CloakBrowser Chromium binary |
+| `CDP_URL` | — | Remote `cloakserve` URL |
 | `SESSION_TTL_MS` | `1800000` (30 min) | Session idle timeout |
+
+## How It Works
+
+Marlin uses **Playwright** with **CloakBrowser** to automate Projects.co.id:
+
+1. **Auth** — logs in, keeps cookies in a Playwright context
+2. **Deposit** — submits deposit form → extracts payment instructions
+3. **Confirm** — clicks Confirm Payment when status is `Waiting Payment`
+
+Each `session_id` maps to an isolated browser context. Sessions expire after 30 minutes of inactivity.
 
 ## License
 
