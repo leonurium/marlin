@@ -53,35 +53,126 @@ REST API wrapper for [Projects.co.id](https://projects.co.id) — automate depos
 ## Quick Start
 
 ```bash
-# Install
 npm install
-
-# Set browsers path (optional — defaults to /root/.cloakbrowser/...)
 cp .env.example .env
-
-# Run
+# Set CHROMIUM_PATH to your local CloakBrowser binary, then:
 npm start
 ```
 
 Server listens on `http://localhost:3100`.
 
-## How It Works
+**Local CloakBrowser** (recommended for development):
 
-Marlin uses **Playwright** (stealth Chromium via CloakBrowser) to automate Projects.co-id's web interface:
+```bash
+BROWSER_MODE=local
+CHROMIUM_PATH=/path/to/cloakbrowser/chromium-*/chrome
+```
 
-1. **Auth** — logs in, saves session as Playwright storage state
-2. **Deposit** — uses the saved session to submit deposit form → extracts payment instructions
-3. **Confirm** — checks order status → clicks Confirm Payment if still `Waiting Payment`
+## Browser Modes
 
-Each `session_id` maps to an isolated Playwright browser context with its own cookies. Sessions expire after 30 minutes of inactivity (auto-cleanup).
+| Mode | When to use | Required env |
+|------|-------------|--------------|
+| **local** | Dev machine with CloakBrowser installed | `CHROMIUM_PATH` (optional) |
+| **cdp** | Shared `cloakserve` on Docker/Koyeb | `CDP_URL` |
+| **manager** | [CloakBrowser Manager](https://github.com/CloakHQ/CloakBrowser-Manager) | `MANAGER_URL` |
+| **auto** | `MANAGER_URL` → `CDP_URL` → local | — |
+
+```bash
+# Remote CDP (cloakserve)
+BROWSER_MODE=cdp
+CDP_URL=https://your-cloakbrowser.example.com
+
+# Manager (profile per session)
+BROWSER_MODE=manager
+MANAGER_URL=http://localhost:8080
+```
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3100` | Server port |
-| `CHROMIUM_PATH` | `/root/.cloakbrowser/...` | Path to CloakBrowser Chromium |
+| `BROWSER_MODE` | `auto` | `auto`, `local`, `cdp`, or `manager` |
+| `MANAGER_URL` | — | CloakBrowser Manager base URL |
+| `MANAGER_AUTH_TOKEN` | — | Bearer token when Manager `AUTH_TOKEN` is set |
+| `MANAGER_PROXY` | — | Residential proxy URL for Manager profiles (`http://user:pass@host:port`) |
+| `MANAGER_GEOIP` | `true` if proxy set | Match timezone/locale to proxy exit IP |
+| `MANAGER_HEADLESS` | `true` | Set `false` for headed mode |
+| `CHROMIUM_PATH` | auto | Local CloakBrowser Chromium binary |
+| `CDP_URL` | — | Remote `cloakserve` URL |
 | `SESSION_TTL_MS` | `1800000` (30 min) | Session idle timeout |
+| `UPSTASH_REDIS_REST_URL` | — | Upstash Redis REST endpoint (optional) |
+| `UPSTASH_REDIS_REST_TOKEN` | — | Upstash Redis REST token |
+
+## Session storage
+
+By default sessions live in memory (lost on restart). Set **Upstash Redis** env vars to persist session metadata across restarts and share sessions across Marlin instances:
+
+- **Manager mode** — stores `profileId`; reconnects CDP to the running Manager profile on cache miss
+- **Local/CDP mode** — stores Playwright `storageState` (cookies) and restores a new context
+
+Live `BrowserContext` objects stay in-process (L1 cache); Redis is the durable L2.
+
+## Deploy to Vercel
+
+Marlin can run as a serverless API on Vercel when paired with **CloakBrowser Manager** (browser on Koyeb) and **Upstash Redis** (session metadata).
+
+### Requirements
+
+| Component | Role |
+|-----------|------|
+| **Vercel** | HTTP API (60s max duration on Hobby) |
+| **Manager** | Always-on CloakBrowser profiles |
+| **Upstash Redis** | `profileId` + session TTL across invocations |
+| **Proxy** | Set on Manager (`MANAGER_PROXY`) if datacenter IPs are blocked |
+
+### Vercel environment variables
+
+```bash
+BROWSER_MODE=manager
+MANAGER_URL=https://your-manager.koyeb.app
+MANAGER_PROXY=http://user:pass@proxy:port   # if needed
+MANAGER_GEOIP=true
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+SESSION_TTL_MS=1800000
+```
+
+Optional: `MANAGER_AUTH_TOKEN`, `MANAGER_HEADLESS`.
+
+### Deploy
+
+```bash
+npm i -g vercel   # once
+vercel            # link project, set env vars in dashboard
+vercel --prod
+```
+
+Local serverless preview:
+
+```bash
+npm run vercel:dev
+```
+
+### How serverless sessions work
+
+1. **Connect** — login via Manager, save `profileId` to Redis, detach CDP (profile keeps running)
+2. **Deposit / confirm** — load session from Redis, reconnect CDP, run flow, detach again
+3. **Disconnect** — delete Redis key and release Manager profile
+
+`vercel.json` sets `maxDuration: 60` and skips Playwright browser download (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`).
+
+For long-running local/Koyeb deployments, use `npm start` instead (keeps warm in-memory sessions).
+
+## How It Works
+
+Marlin uses **Playwright** with **CloakBrowser** to automate Projects.co.id:
+
+1. **Auth** — logs in, keeps cookies in a Playwright context
+2. **Deposit** — submits deposit form → extracts payment instructions
+3. **Confirm** — clicks Confirm Payment when status is `Waiting Payment`
+
+Each `session_id` maps to an isolated browser context. Sessions expire after 30 minutes of inactivity.
 
 ## License
 

@@ -1,5 +1,8 @@
 node_modules/
 dist/
+debug
 .env
 *.log
 .cache/
+.cursor/
+.vercel
