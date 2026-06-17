@@ -4,11 +4,16 @@ import rateLimit from 'express-rate-limit';
 import authRouter from './routes/auth.js';
 import depositRouter from './routes/deposit.js';
 import { getBrowserConfig } from './lib/browser.js';
-import { validateDeploymentConfig } from './lib/env.js';
+import { isServerless, validateDeploymentConfig } from './lib/env.js';
 
 validateDeploymentConfig();
 
 const app = express();
+
+// Vercel sets X-Forwarded-For; express-rate-limit requires trust proxy
+if (isServerless()) {
+  app.set('trust proxy', 1);
+}
 
 app.use(cors());
 app.use(express.json());
