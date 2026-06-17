@@ -64,7 +64,7 @@ router.post('/connect', async (req, res) => {
     }
 
     const loggedInAs = await getLoggedInUsername(page);
-    const sessionId = createSession(context, loggedInAs || username, { profileId, browser });
+    const sessionId = await createSession(context, loggedInAs || username, { profileId, browser });
     await page.close();
 
     console.log(`[auth] ${loggedInAs} connected — session ${sessionId}`);
@@ -79,12 +79,12 @@ router.post('/connect', async (req, res) => {
 });
 
 // DELETE /api/auth/disconnect
-router.delete('/disconnect', (req, res) => {
+router.delete('/disconnect', async (req, res) => {
   const sessionId = req.headers['x-session-id'] as string;
   if (!sessionId) {
     return res.status(400).json({ error: 'x-session-id header required' });
   }
-  const deleted = deleteSession(sessionId);
+  const deleted = await deleteSession(sessionId);
   if (!deleted) {
     return res.status(404).json({ error: 'Session not found' });
   }
@@ -93,8 +93,8 @@ router.delete('/disconnect', (req, res) => {
 });
 
 // GET /api/auth/sessions
-router.get('/sessions', (_req, res) => {
-  res.json({ sessions: listSessions() });
+router.get('/sessions', async (_req, res) => {
+  res.json({ sessions: await listSessions() });
 });
 
 export default router;

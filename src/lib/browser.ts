@@ -89,12 +89,24 @@ export async function connectManagerSession(sessionLabel: string): Promise<Manag
   return { profileId, browser, context };
 }
 
-export async function disconnectManagerSession(session: ManagerSession): Promise<void> {
-  const { profileId, browser, context } = session;
-  await context.close().catch(() => {});
-  if (browser.isConnected()) {
-    await browser.close().catch(() => {});
+export async function reconnectManagerProfile(profileId: string): Promise<ManagerSession> {
+  const browser = await chromium.connectOverCDP(profileCdpUrl(profileId));
+  const context = browser.contexts()[0] ?? await browser.newContext();
+  console.log(`[manager] reconnected profile ${profileId}`);
+  return { profileId, browser, context };
+}
+
+/** Release CDP connection only — profile stays running on Manager. */
+export async function detachManagerSession(session: ManagerSession): Promise<void> {
+  await session.context.close().catch(() => {});
+  if (session.browser.isConnected()) {
+    await session.browser.close().catch(() => {});
   }
+}
+
+export async function disconnectManagerSession(session: ManagerSession): Promise<void> {
+  const { profileId } = session;
+  await detachManagerSession(session);
   await releaseProfile(profileId);
   console.log(`[manager] released profile ${profileId}`);
 }

@@ -4,3 +4,5 @@ debug
 .env
 *.log
 .cache/
+.cursor/
+.vercel
