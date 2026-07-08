@@ -1,14 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Browser, BrowserContext } from 'playwright';
 import {
-  detachManagerSession,
   disconnectManagerSession,
   getBrowser,
   getBrowserMode,
   reconnectManagerProfile,
   type BrowserMode,
 } from './browser.js';
-import { isServerless } from './env.js';
 import { releaseProfile } from './manager.js';
 import { getRedis, isRedisEnabled } from './redis.js';
 
@@ -85,23 +83,6 @@ async function destroySession(session: Session): Promise<void> {
   await session.context.close().catch(() => {});
 }
 
-/** Close live CDP/context but keep Redis record and Manager profile (serverless). */
-export async function detachSessionHandle(id: string): Promise<void> {
-  const session = sessions.get(id);
-  if (!session) return;
-  sessions.delete(id);
-
-  if (session.profileId && session.browser) {
-    await detachManagerSession({
-      profileId: session.profileId,
-      browser: session.browser,
-      context: session.context,
-    });
-    return;
-  }
-  await session.context.close().catch(() => {});
-}
-
 async function hydrateSession(record: SessionRecord): Promise<Session | null> {
   try {
     if (record.browserMode === 'manager' && record.profileId) {
@@ -150,20 +131,17 @@ async function hydrateSession(record: SessionRecord): Promise<Session | null> {
   }
 }
 
-// Cleanup expired in-memory sessions (long-running Node only)
-if (!isServerless()) {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [id, session] of sessions) {
-      if (now - session.lastAccess > SESSION_TTL) {
-        sessions.delete(id);
-        void destroySession(session);
-        void removeRecord(id);
-        console.log(`[session] expired: ${id}`);
-      }
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of sessions) {
+    if (now - session.lastAccess > SESSION_TTL) {
+      sessions.delete(id);
+      void destroySession(session);
+      void removeRecord(id);
+      console.log(`[session] expired: ${id}`);
     }
-  }, 5 * 60_000);
-}
+  }
+}, 5 * 60_000);
 
 export async function createSession(
   context: BrowserContext,
@@ -194,10 +172,6 @@ export async function createSession(
     browserMode,
     storageState,
   });
-
-  if (isServerless()) {
-    await detachSessionHandle(id);
-  }
 
   return id;
 }

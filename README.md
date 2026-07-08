@@ -113,56 +113,29 @@ By default sessions live in memory (lost on restart). Set **Upstash Redis** env 
 
 Live `BrowserContext` objects stay in-process (L1 cache); Redis is the durable L2.
 
-## Deploy to Vercel
+## Production deployment
 
-Marlin can run as a serverless API on Vercel when paired with **CloakBrowser Manager** (browser on Koyeb) and **Upstash Redis** (session metadata).
+Run as a long-lived Node process (recommended: **Koyeb**, Fly.io, Railway, or a VPS):
 
-### Requirements
+```bash
+npm install
+npm run build
+npm run serve
+```
 
-| Component | Role |
-|-----------|------|
-| **Vercel** | HTTP API (60s max duration on Hobby) |
-| **Manager** | Always-on CloakBrowser profiles |
-| **Upstash Redis** | `profileId` + session TTL across invocations |
-| **Proxy** | Set on Manager (`MANAGER_PROXY`) if datacenter IPs are blocked |
-
-### Vercel environment variables
+Typical production env:
 
 ```bash
 BROWSER_MODE=manager
 MANAGER_URL=https://your-manager.koyeb.app
-MANAGER_PROXY=http://user:pass@proxy:port   # if needed
+MANAGER_PROXY=http://user:pass@proxy:port   # if WAF blocks datacenter IPs
 MANAGER_GEOIP=true
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=...
-SESSION_TTL_MS=1800000
+PORT=3100
 ```
 
-Optional: `MANAGER_AUTH_TOKEN`, `MANAGER_HEADLESS`.
-
-### Deploy
-
-```bash
-npm i -g vercel   # once
-vercel            # link project, set env vars in dashboard
-vercel --prod
-```
-
-Local serverless preview:
-
-```bash
-npm run vercel:dev
-```
-
-### How serverless sessions work
-
-1. **Connect** — login via Manager, save `profileId` to Redis, detach CDP (profile keeps running)
-2. **Deposit / confirm** — load session from Redis, reconnect CDP, run flow, detach again
-3. **Disconnect** — delete Redis key and release Manager profile
-
-`vercel.json` sets `maxDuration: 60` and skips Playwright browser download (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`).
-
-For long-running local/Koyeb deployments, use `npm start` instead (keeps warm in-memory sessions).
+Pair with **CloakBrowser Manager** on Koyeb for browser profiles and **Upstash Redis** for session persistence across restarts.
 
 ## How It Works
 

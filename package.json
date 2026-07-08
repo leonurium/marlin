@@ -9,7 +9,6 @@
     "start": "tsx src/index.ts",
     "build": "tsc",
     "serve": "node dist/index.js",
-    "vercel:dev": "vercel dev",
     "test": "npm run test:manager",
     "test:manager": "tsx scripts/test-manager.ts",
     "test:auth": "tsx scripts/test-auth.ts"

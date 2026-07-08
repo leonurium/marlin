@@ -1,32 +1,22 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { detachSessionHandle, getSession, type Session } from '../lib/sessions.js';
-import { isServerless } from '../lib/env.js';
+import { getSession, type Session } from '../lib/sessions.js';
 import { createDeposit, getOrderStatus, confirmDeposit } from '../services/deposit.js';
 
 const router = Router();
 
-type SessionRequest = Request & { session: Session; sessionId: string };
+type SessionRequest = Request & { session: Session };
 
 async function requireSession(req: Request, res: Response, next: NextFunction) {
   const sid = req.body?.session_id || req.query?.session_id;
   if (!sid) return res.status(400).json({ error: 'session_id required' });
 
-  const sessionId = String(sid);
-  const session = await getSession(sessionId);
+  const session = await getSession(String(sid));
   if (!session) {
     return res.status(401).json({ error: 'Invalid or expired session — call POST /api/auth/connect first' });
   }
 
   (req as SessionRequest).session = session;
-  (req as SessionRequest).sessionId = sessionId;
-
-  if (isServerless()) {
-    res.on('finish', () => {
-      void detachSessionHandle(sessionId);
-    });
-  }
-
   next();
 }
 
