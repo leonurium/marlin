@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.git
+.github
+.cursor
+.cache
+debug
+*.log
+npm-debug.log*
+README.md
+docs
+openspec
+scripts
+LICENSE
