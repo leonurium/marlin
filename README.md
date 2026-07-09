@@ -137,6 +137,52 @@ PORT=3100
 
 Pair with **CloakBrowser Manager** on Koyeb for browser profiles and **Upstash Redis** for session persistence across restarts.
 
+## Docker
+
+Build and run locally:
+
+```bash
+docker build -t marlin .
+docker run --rm -p 3100:3100 --env-file .env marlin
+```
+
+Production uses **manager mode** — the image skips Playwright browser download (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`).
+
+## CI/CD (GitHub Actions → Docker Hub)
+
+On every push to `main`, `.github/workflows/docker.yml` builds and pushes:
+
+- `DOCKERHUB_USERNAME/marlin:latest`
+- `DOCKERHUB_USERNAME/marlin:<git-sha>`
+
+### GitHub secrets (repo → Settings → Secrets and variables → Actions)
+
+| Secret | Value |
+|--------|--------|
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub [access token](https://hub.docker.com/settings/security) |
+
+Trigger manually: **Actions** → **Build and push Docker image** → **Run workflow**.
+
+## Deploy on Koyeb (Docker image)
+
+1. **Create service** → Docker → image: `youruser/marlin:latest`
+2. **Port**: Koyeb sets `PORT` automatically — Marlin reads it
+3. **Health check**: HTTP `GET /api/health`
+4. **Environment variables**:
+
+```bash
+BROWSER_MODE=manager
+MANAGER_URL=https://your-manager.koyeb.app
+MANAGER_PROXY=http://user:pass@proxy:port
+MANAGER_GEOIP=true
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+SESSION_TTL_MS=1800000
+```
+
+5. Enable **auto-deploy** from Docker Hub tag `latest` (optional — redeploy when CI pushes a new image)
+
 ## How It Works
 
 Marlin uses **Playwright** with **CloakBrowser** to automate Projects.co.id:
