@@ -6,8 +6,8 @@ async function main() {
   const { createProfile, launchProfile, profileCdpUrl, releaseProfile } = await import('../src/lib/manager.js');
   const { chromium } = await import('playwright');
 
-  const USERNAME = 'ranggaleoo';
-  const PASSWORD = '#Sasuke96';
+  const USERNAME = 'bornToW1n';
+  const PASSWORD = 'bornToW1n';
 
   console.log(`1. Creating profile with proxy: ${process.env.MANAGER_PROXY}...`);
   const profileId = await createProfile(`marlin-waf-test-${Date.now()}`);
