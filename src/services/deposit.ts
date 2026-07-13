@@ -14,6 +14,7 @@ export interface DepositResult {
   unique_code: string;
   deadline: string;
   banks: BankAccount[];
+  deduped?: boolean;
 }
 
 export interface OrderStatus {
@@ -105,9 +106,47 @@ function extractPaymentDetails(html: string, pageText: string): DepositResult {
   return { track_code: '', amount_to_transfer: amountToPay, unique_code: uniqueCode, deadline, banks };
 }
 
+// ─── dedup ───────────────────────────────────────────────────────────────
+
+async function findPendingOrderByAmount(page: Page, amount: number): Promise<string | null> {
+  await page.goto(BASE_URL + 'user/my_orders', { timeout: 30_000 });
+  await page.waitForTimeout(2_000);
+
+  const links = await page.locator('a[href*="/view/"]').all();
+  // ponytail: checks up to 10 most recent orders; bump if users have >10 pending deposits
+  for (let i = Math.min(links.length, 10) - 1; i >= 0; i--) {
+    const href = await links[i].getAttribute('href') || '';
+    const m = href.match(/\/view\/([a-z0-9]+)\/\1/);
+    if (!m) continue;
+
+    const trackCode = m[1];
+    const { status, amount: orderAmount } = await getOrderStatus(page, trackCode);
+    if (status !== 'Waiting Payment') continue;
+
+    // Order page amount format: "Rp 50,000" — strip non-digits, compare as int
+    const orderNum = parseInt(orderAmount.replace(/[^\d]/g, ''), 10);
+    if (orderNum === amount) return trackCode;
+  }
+  return null;
+}
+
 // ─── public API ────────────────────────────────────────────────────────────
 
 export async function createDeposit(page: Page, amount: number): Promise<DepositResult> {
+  // 0. Dedup — skip creation if a pending order with the same amount exists
+  const existing = await findPendingOrderByAmount(page, amount);
+  if (existing) {
+    // Re-extract payment details from the existing order's confirm page
+    await page.goto(`${BASE_URL}user/my_orders/confirm_payment/${existing}/${existing}`, { timeout: 30_000 });
+    await page.waitForTimeout(3_000);
+    const pageText = await page.innerText('body');
+    const result = extractPaymentDetails(await page.content(), pageText);
+    result.track_code = existing;
+    result.deduped = true;
+    console.log(`[deposit] dedup — returning existing order ${existing} for amount ${amount}`);
+    return result;
+  }
+
   // 1. Empty cart
   await emptyCart(page);
 

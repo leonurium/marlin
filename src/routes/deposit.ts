@@ -33,7 +33,8 @@ router.post('/', requireSession, async (req, res) => {
     const page = await session.context.newPage();
     const result = await createDeposit(page, amount);
     await page.close();
-    console.log(`[deposit] created ${result.track_code} — ${amount} + ${result.unique_code}`);
+    const wasDeduped = result.deduped === true;
+    console.log(`[deposit] ${wasDeduped ? 'deduped' : 'created'} ${result.track_code} — ${amount}`);
     return res.json(result);
   } catch (err: any) {
     console.error('[deposit] error:', err);
