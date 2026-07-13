@@ -37,6 +37,8 @@ REST API wrapper for [Projects.co.id](https://projects.co.id) — automate depos
   }
 ```
 
+**Dedup:** If an existing "Waiting Payment" order with the same amount is found, Marlin returns that order's details instead of creating a duplicate. The response includes `"deduped": true` so callers can distinguish deduped from newly created deposits.
+
 ### `POST /api/deposit/confirm`
 
 ```json
