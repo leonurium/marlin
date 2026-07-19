@@ -64,7 +64,7 @@ async function findLatestOrderId(page: Page): Promise<string | null> {
 function extractPaymentDetails(html: string, pageText: string): DepositResult {
   // Extract amount to pay
   const amountMatch = pageText.match(/(?:total tagihan|total\s+sum|sebesar)\s*:?\s*([Rr]p\.?\s*[\d,]+)/i)
-    || pageText.match(/([Rr]p\.?\s*[\d,]{1,3}(?:\.\d{3})*(?:,\d{3})*)/);
+    || pageText.match(/([Rr]p\.?\s*\d{1,3}(?:\.\d{3})*(?:,\d{3})*)/);
   const amountToPay = amountMatch ? amountMatch[1].trim() : 'Rp ???';
 
   // Extract unique code (3 digits at end, after base amount)
